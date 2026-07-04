@@ -38,7 +38,7 @@ class GildedRose(object):
                     if item.quality < 50:
                         item.quality = item.quality + 1
         for receipt in self.receipts:
-            now = datetime.now()
+            now = self.now()
             if now <= receipt.return_deadline:
                 if (receipt.return_deadline - now).days < 7:
                     receipt.status = "expiring_soon"
@@ -49,6 +49,9 @@ class GildedRose(object):
                     receipt.status = "archived"
                 else:
                     receipt.status = "purged"
+
+    def now(self):
+        return datetime.now()
 
 
 class Item:
