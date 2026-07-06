@@ -82,8 +82,8 @@ class Item:
 
 
 class Receipt:
-    def __init__(self, item_name, customer_name, purchase_datetime, item):
-        self.item_name = item_name
+    def __init__(self, item, customer_name, purchase_datetime):
+        self.item_name = item.name
         self.customer_name = customer_name
         self.purchase_datetime = purchase_datetime
 
