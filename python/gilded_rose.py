@@ -37,18 +37,38 @@ class GildedRose(object):
                 else:
                     if item.quality < 50:
                         item.quality = item.quality + 1
+
+    def update_receipts(self):
         for receipt in self.receipts:
             now = datetime.now()
             if now <= receipt.return_deadline:
-                if (receipt.return_deadline - now).days < 7:
-                    receipt.status = "expiring_soon"
-                else:
-                    receipt.status = "valid"
+                receipt.status = "can_be_returned"
             else:
-                if now <= receipt.return_deadline + timedelta(days=90):
-                    receipt.status = "archived"
+                if now <= receipt.return_deadline + timedelta(days=30):
+                    receipt.status = "cannot_be_returned"
                 else:
-                    receipt.status = "purged"
+                    receipt.status = "archived"
+
+    def generate_receipt_report(self):
+        can_be_returned_count = 0
+        cannot_be_returned_count = 0
+        archived_count = 0
+        for receipt in self.receipts:
+            if receipt.status == "can_be_returned":
+                can_be_returned_count = can_be_returned_count + 1
+            if receipt.status == "cannot_be_returned":
+                cannot_be_returned_count = cannot_be_returned_count + 1
+            if receipt.status == "archived":
+                archived_count = archived_count + 1
+        report = "===== Receipt Report [%s] =====\n" % datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        report = report + "can_be_returned: %d\n" % can_be_returned_count
+        report = report + "cannot_be_returned: %d\n" % cannot_be_returned_count
+        report = report + "archived: %d\n" % archived_count
+        report = report + "\n"
+        for receipt in self.receipts:
+            if receipt.status != "archived":
+                report = report + str(receipt) + "\n"
+        return report
 
 
 class Item:
@@ -62,48 +82,45 @@ class Item:
 
 
 class Receipt:
-    def __init__(self, item_name, customer_name, purchase_datetime):
+    def __init__(self, item_name, customer_name, purchase_datetime, item):
         self.item_name = item_name
         self.customer_name = customer_name
         self.purchase_datetime = purchase_datetime
-        if purchase_datetime.weekday() >= 5:
-            self.return_deadline = purchase_datetime + timedelta(days=14)
+
+        if purchase_datetime.weekday() == 5:
+            deadline_days = 16
         else:
-            self.return_deadline = purchase_datetime + timedelta(days=30)
-        if purchase_datetime.hour >= 18:
-            self.return_deadline = self.return_deadline + timedelta(days=1)
+            if purchase_datetime.weekday() == 6:
+                deadline_days = 15
+            else:
+                deadline_days = 14
+        if purchase_datetime.weekday() < 5:
+            if purchase_datetime.hour >= 18:
+                deadline_days = deadline_days + 1
+
+        self.return_deadline = purchase_datetime + timedelta(days=deadline_days)
+
+        can_return = True
+        if item.name != "Sulfuras, Hand of Ragnaros":
+            projected_sell_in = item.sell_in - deadline_days
+            if projected_sell_in <= 2:
+                can_return = False
+            if item.name != "Aged Brie":
+                projected_quality = item.quality - deadline_days
+                if projected_quality <= 2:
+                    can_return = False
+
+        if not can_return:
+            self.return_deadline = purchase_datetime
+
         now = datetime.now()
         if now <= self.return_deadline:
-            if (self.return_deadline - now).days < 7:
-                self.status = "expiring_soon"
-            else:
-                self.status = "valid"
+            self.status = "can_be_returned"
         else:
-            if now <= self.return_deadline + timedelta(days=90):
-                self.status = "archived"
+            if now <= self.return_deadline + timedelta(days=30):
+                self.status = "cannot_be_returned"
             else:
-                self.status = "purged"
+                self.status = "archived"
 
     def __repr__(self):
-        return "%s, %s, %s, %s" % (self.item_name, self.customer_name, self.return_deadline.strftime("%Y-%m-%d"), self.status)
-
-
-def generate_receipt_report(receipts):
-    print("===== Receipt Report [%s] =====" % datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-    valid_count = 0
-    expiring_count = 0
-    archived_count = 0
-    for receipt in receipts:
-        if receipt.status == "valid":
-            valid_count = valid_count + 1
-        if receipt.status == "expiring_soon":
-            expiring_count = expiring_count + 1
-        if receipt.status == "archived":
-            archived_count = archived_count + 1
-    print("Valid: %d" % valid_count)
-    print("Expiring soon: %d" % expiring_count)
-    print("Archived: %d" % archived_count)
-    print("")
-    for receipt in receipts:
-        if receipt.status != "purged":
-            print(receipt)
+        return "%s, %s, %s, %s" % (self.item_name, self.customer_name, self.return_deadline.strftime("%Y-%m-%d %H:%M"), self.status)
